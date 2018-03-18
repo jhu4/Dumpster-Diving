@@ -6,10 +6,15 @@
 #include <libgen.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+ #include <sys/time.h>
 #include <linux/errno.h>
 #include <errno.h>
 #include <string.h>
 #include <dirent.h>
+#include <fcntl.h>
+#include <utime.h>
+#include <limits.h>
+
 
 void print_help();
 void print_stat(std::string path);
@@ -18,6 +23,9 @@ void to_dumpster(std::string file, std::string dumpster_path);
 void to_dumpster_recursively(std::string full_path
 																	, std::string relative_parent_path
 																	, std::string dumpster_path);
+void copy_file(std::string from, std::string to);
+void perserve_metadata(std::string path, struct stat* metadata);
+
 
 int main(int argc, char *argv[]) {
 	int fflag = 0, hflag = 0, rflag = 0;
@@ -25,6 +33,7 @@ int main(int argc, char *argv[]) {
 	std::vector<std::string> files;
 	char* dumpster_path;
 	char* current_path;
+	char buf[PATH_MAX];
 
 	//get the DUMPSTER enviornment path
 	dumpster_path = getenv("DUMPSTER");
@@ -72,8 +81,14 @@ int main(int argc, char *argv[]) {
   		temp.insert(0, current_path);
   	}
 
-  	std::cout << temp << std::endl;
-  	files.push_back(temp);
+  	if (realpath(temp.c_str(), buf)) {
+	  	std::cout << buf << std::endl;
+	  	files.push_back(std::string(buf));
+  	}
+  	else {
+  		std::cerr << "realpath: " <<  strerror(errno) << std::endl;
+  	}
+
   }
   
   for (auto file : files) {
@@ -101,7 +116,7 @@ void to_dumpster(std::string file, std::string dumpster_path) {
   															.c_str());
 
 	if (i == -1) {
-		std::cerr << file << ": " <<  strerror(errno) << std::endl;
+		// std::cerr << file << ": " <<  strerror(errno) << std::endl;
 		to_dumpster_recursively(file, std::string(""), dumpster_path);
 	}
 }
@@ -114,10 +129,14 @@ void to_dumpster_recursively(std::string full_path
 	struct stat metadata;
 	struct dirent* dir_metadata;
 	DIR* dir_ptr;
+	std::string dest = std::string(dumpster_path)
+																			.append(relative_parent_path)
+																			.append(base_name);
 	std::string next_relative_parent_path = std::string(relative_parent_path)
-																					.append(base_name)
-																					.append("/");
-
+																								.append(base_name)
+																								.append("/");
+	std::string dot = std::string(".");
+	std::string dotdot = std::string("..");
 
 	if (stat(full_path.c_str(), &metadata) == -1) {
 		std::cerr << full_path << ": " <<  strerror(errno) << std::endl;
@@ -126,7 +145,8 @@ void to_dumpster_recursively(std::string full_path
 
 	//if is not a directory
 	if(!S_ISDIR(metadata.st_mode)) {
-		std::cerr << full_path << " is not a directory" << std::endl;
+		copy_file(full_path, dest);
+		perserve_metadata(dest, &metadata);
 		return;
 	}
 
@@ -137,23 +157,64 @@ void to_dumpster_recursively(std::string full_path
 	}
 
 	//make a directory in the dumpster
-	std::string relative_path = std::string(dumpster_path)
-																				.append(relative_parent_path)
-																				.append(base_name);
-	if (mkdir(relative_path.c_str(), umask(0)) == -1) {
-		std::cerr << "In mkdir\t" << relative_path << ": " <<  strerror(errno) << std::endl;
+	if (mkdir(dest.c_str(), umask(0)) == -1) {
+		std::cerr << "In mkdir\t" << dest << ": " <<  strerror(errno) << std::endl;
 		return;
 	}
-	while ((dir_metadata = readdir(dir_ptr)) != NULL) {
+	
+	//change the mode to open to every one to prevent permission deny
+	if (chmod(dest.c_str(), S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
+		std::cerr << "In chmod\t" << dest << ": " <<  strerror(errno) << std::endl;
+		return;
+	}
+
+	while (dir_metadata = readdir(dir_ptr)) {
 		std::string next_full_path = std::string(full_path)
 																	.append("/")
 																	.append(dir_metadata->d_name);
-		
-		to_dumpster_recursively(next_full_path
+		if (dot.compare(dir_metadata->d_name) && dotdot.compare(dir_metadata->d_name)) {
+			to_dumpster_recursively(next_full_path
 														, next_relative_parent_path, dumpster_path);
+		}
 	}
 	
+	perserve_metadata(dest, &metadata);
 	closedir(dir_ptr);	
+}
+
+
+
+void perserve_metadata(std::string path, struct stat* metadata) {
+	if (chmod(path.c_str(), metadata->st_mode) == -1) {
+		std::cerr << "In chmod\t" << path << ": " <<  strerror(errno) << std::endl;
+		return;
+	}
+
+	struct timeval perserve_time[2];
+	perserve_time[0].tv_sec = metadata->st_atim.tv_sec;
+	perserve_time[0].tv_usec = metadata->st_atim.tv_nsec / 1000;
+	perserve_time[1].tv_sec = metadata->st_mtim.tv_sec;
+	perserve_time[1].tv_usec = metadata->st_mtim.tv_nsec / 1000;
+	
+	if (utimes(path.c_str(), perserve_time) == -1) {
+		std::cerr << "In utime\t" << path << ": " <<  strerror(errno) << std::endl;
+		return;
+	} 
+}
+
+void copy_file(std::string from, std::string to) {
+	char buf[1024];
+	size_t size;
+
+  int src = open(from.c_str(), O_RDONLY, 0);
+  int dest = open(to.c_str(), O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO) ;
+
+  while ((size = read(src, buf, 1024)) > 0) {
+      write(dest, buf, size);
+  }
+
+  close(src);
+  close(dest);
 }
 
 
@@ -189,7 +250,7 @@ void print_stat(std::string path) {
 
 	std::cout << tmp.st_dev << std::endl;
 	std::cout << tmp.st_ino << std::endl;
-	std::cout << tmp.st_mode << std::endl;
+	std::cout << tmp.st_mode << "\t--permission" << std::endl;
 	std::cout << tmp.st_nlink << std::endl;
 	std::cout << tmp.st_uid << std::endl;
 	std::cout << tmp.st_gid << std::endl;
@@ -197,8 +258,8 @@ void print_stat(std::string path) {
 	std::cout << tmp.st_size << std::endl;
 	std::cout << tmp.st_blksize << std::endl;
 	std::cout << tmp.st_blocks << std::endl;
-	std::cout << tmp.st_atime << std::endl;
-	std::cout << tmp.st_mtime << std::endl;
+	std::cout << tmp.st_atime << "\t--access time" << std::endl;
+	std::cout << tmp.st_mtime << "\t--modify time" << std::endl;
 	std::cout << tmp.st_ctime << std::endl;
 
 }
