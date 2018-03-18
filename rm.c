@@ -147,6 +147,7 @@ void to_dumpster_recursively(std::string full_path
 	if(!S_ISDIR(metadata.st_mode)) {
 		copy_file(full_path, dest);
 		perserve_metadata(dest, &metadata);
+		unlink(full_path.c_str());
 		return;
 	}
 
@@ -179,7 +180,8 @@ void to_dumpster_recursively(std::string full_path
 	}
 	
 	perserve_metadata(dest, &metadata);
-	closedir(dir_ptr);	
+	closedir(dir_ptr);
+	rmdir(full_path.c_str());
 }
 
 
