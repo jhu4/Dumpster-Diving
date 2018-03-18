@@ -101,19 +101,30 @@ int main(int argc, char *argv[]) {
 
 void to_dumpster(std::string file, std::string dumpster_path) {
 	struct stat metadata;
+	int ext;
+
+	char* file_basename = basename((char*)file.c_str());
+	std::string dest = std::string(dumpster_path)
+  															.append("/")
+  															.append(file_basename)
+  															.c_str();
 
 	if (stat(file.c_str(), &metadata) == -1) {
 		std::cerr << file << ": " <<  strerror(errno) << std::endl;
 		return;
 	}
 
-	char* file_basename = basename((char*)file.c_str());
 	print_stat(file);
 
-	int i = rename(file.c_str(), std::string(dumpster_path)
-  															.append("/")
-  															.append(file_basename)
-  															.c_str());
+	if ((ext = get_ext(dest)) == -1) {
+		std::cerr << "capacity of " << file_basename << " reaches maximum" << std::endl;
+		return;
+	}
+	else if (ext > 0) {
+		dest.append(".").append(std::to_string(ext));
+	}
+
+	int i = rename(file.c_str(), dest.c_str());
 
 	if (i == -1) {
 		// std::cerr << file << ": " <<  strerror(errno) << std::endl;
@@ -132,19 +143,26 @@ void to_dumpster_recursively(std::string full_path
 	std::string dest = std::string(dumpster_path)
 																			.append(relative_parent_path)
 																			.append(base_name);
-	std::string next_relative_parent_path = std::string(relative_parent_path)
-																								.append(base_name)
-																								.append("/");
+
 	std::string dot = std::string(".");
 	std::string dotdot = std::string("..");
+	int ext;
 
 	if (stat(full_path.c_str(), &metadata) == -1) {
 		std::cerr << full_path << ": " <<  strerror(errno) << std::endl;
 		return;
 	}
 
+	if ((ext = get_ext(dest)) == -1) {
+		std::cerr << "capacity of " << base_name << " reaches maximum" << std::endl;
+		return;
+	}
+	else if (ext > 0) {
+		dest.append(".").append(std::to_string(ext));
+	}
+
 	//if is not a directory
-	if(!S_ISDIR(metadata.st_mode)) {
+	if (!S_ISDIR(metadata.st_mode)) {
 		copy_file(full_path, dest);
 		perserve_metadata(dest, &metadata);
 		unlink(full_path.c_str());
@@ -168,6 +186,10 @@ void to_dumpster_recursively(std::string full_path
 		std::cerr << "In chmod\t" << dest << ": " <<  strerror(errno) << std::endl;
 		return;
 	}
+
+	std::string next_relative_parent_path = std::string(dest)
+																								.erase(0, dumpster_path.length())
+																								.append("/");
 
 	while (dir_metadata = readdir(dir_ptr)) {
 		std::string next_full_path = std::string(full_path)
@@ -220,21 +242,24 @@ void copy_file(std::string from, std::string to) {
 }
 
 
-//get the next extension of a file in the dumpster
+//add the next extension of a file in the dumpster
+//return next ext number if successfully added, -1 if next extension is > 9
 int get_ext(std::string filename) {
-	filename.insert(0, getenv("DUMPSTER"));
-
 	//file exists
 	if (access(filename.c_str(), F_OK) == 0) {
-		filename.append(".1");
+		filename.append("..");
 
-		char* file = (char*) filename.c_str();
+		
 		int last_index = filename.length() - 1;
 
-		while (access(file, F_OK) == 0) {
-			file[last_index] += 1;
+		for (int i = 1; i < 10; i++) {
+			filename[last_index] = i + '0';
+			//if this file does not exist
+			if (access(filename.c_str(), F_OK) == -1) {
+				return i;
+			}
 		}
-		return file[last_index] - '0';
+		return -1;
 	}
 	else {
 		return 0;
