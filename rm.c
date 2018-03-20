@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
  #include <sys/time.h>
-#include <linux/errno.h>
+// #include <linux/errno.h>
 #include <errno.h>
 #include <string.h>
 #include <dirent.h>
@@ -99,6 +99,43 @@ int main(int argc, char *argv[]) {
 }
 
 
+void force_remove(std::string file) {
+	struct stat metadata;
+	struct dirent* dir_metadata;
+	DIR* dir_ptr;
+	std::string dot = std::string(".");
+	std::string dotdot = std::string("..");
+
+	if (stat(file.c_str(), &metadata) == -1) {
+		std::cerr << file << ": " <<  strerror(errno) << std::endl;
+		return;
+	}
+
+		//if is not a directory, which means it is a file
+	if (!S_ISDIR(metadata.st_mode)) {
+		unlink(file.c_str());
+		return;
+	}
+
+
+	if ((dir_ptr = opendir(file.c_str())) == NULL) {
+		std::cerr << file << ": " <<  strerror(errno) << std::endl;
+		return;
+	}
+
+	while (dir_metadata = readdir(dir_ptr)) {
+		std::string next_file = std::string(file)
+																	.append("/")
+																	.append(dir_metadata->d_name);
+		if (dot.compare(dir_metadata->d_name) && dotdot.compare(dir_metadata->d_name)) {
+			force_remove(next_file);
+		}
+	}
+
+	rmdir(file.c_str());
+	return;
+}
+
 void to_dumpster(std::string file, std::string dumpster_path) {
 	struct stat metadata;
 	int ext;
@@ -113,8 +150,6 @@ void to_dumpster(std::string file, std::string dumpster_path) {
 		std::cerr << file << ": " <<  strerror(errno) << std::endl;
 		return;
 	}
-
-	print_stat(file);
 
 	if ((ext = get_ext(dest)) == -1) {
 		std::cerr << "capacity of " << file_basename << " reaches maximum" << std::endl;
