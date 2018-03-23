@@ -1,4 +1,4 @@
-all: rm dv dump
+all: rm dv dump test
 	mkdir -p .build
 	mv *.o .build/
 
@@ -10,6 +10,9 @@ dv: dv.o share.o
 
 dump: dump.o share.o
 	g++ dump.o share.o -o dump
+
+test: test.o share.o
+	g++ test.o share.o -o test
 
 rm.o:
 	g++ -std=c++14 rm.c -c 
@@ -23,6 +26,9 @@ dump.o:
 share.o:
 	g++ -std=c++14 share.c -c	
 
+test.o:
+	g++ -std=c++14 test.c -c	
+
 clean:
-	rm rm dv dump
+	rm rm dv dump test
 	rm -rf .build

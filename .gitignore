@@ -7,3 +7,9 @@ dv
 dump
 
 .build/*
+
+*.csv
+
+*.sh
+
+testdir/*

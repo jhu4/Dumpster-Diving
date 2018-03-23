@@ -65,7 +65,6 @@ int main(int argc, char *argv[]) {
   	
 
   	if (realpath(temp.c_str(), buf)) {
-	  	std::cout << buf << std::endl;
 	  	files.push_back(std::string(buf));
   	}
   	else {
@@ -81,7 +80,7 @@ int main(int argc, char *argv[]) {
 				return -1;
 		}
 
-  	send_file_to(file, std::string(current_path).append("/"));
+  	send_file_to(file, std::string(current_path));
   }
 
 	/* code */

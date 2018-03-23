@@ -80,7 +80,6 @@ void send_file_to(std::string file, std::string dest_path) {
 	int i = rename(file.c_str(), dest.c_str());
 
 	if (i == -1) {
-		// std::cerr << file << ": " <<  strerror(errno) << std::endl;
 		send_file_to_recursively(file, std::string(""), dest_path);
 	}
 }
@@ -94,6 +93,7 @@ void send_file_to_recursively(std::string full_path
 	struct dirent* dir_metadata;
 	DIR* dir_ptr;
 	std::string dest = std::string(dest_path)
+																			.append("/")
 																			.append(relative_parent_path)
 																			.append(base_name);
 

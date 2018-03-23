@@ -53,12 +53,12 @@ int main(int argc, char *argv[]) {
 	dumpster_path = getenv("DUMPSTER");
 	if (dumpster_path == NULL) {
 		std::cerr << "DUMPSTER: " <<  strerror(errno) << std::endl;
-		return 1;
+		return -1;
 	}
 
 	if (access(dumpster_path, F_OK | W_OK | R_OK | X_OK) == -1) {
 		std::cerr << "DUMPSTER: " <<  strerror(errno) << std::endl;
-		return 1;
+		return -1;
 	}
 
   //parse filenames into a vector
@@ -66,7 +66,6 @@ int main(int argc, char *argv[]) {
   	std::string temp = std::string(argv[optind]);
 
   	if (realpath(temp.c_str(), buf)) {
-	  	std::cout << buf << std::endl;
 	  	files.push_back(std::string(buf));
   	}
   	else {
@@ -90,7 +89,7 @@ int main(int argc, char *argv[]) {
   		force_remove(file);
   	}
   	else {
-  		send_file_to(file, std::string(dumpster_path).append("/"));	
+  		send_file_to(file, std::string(dumpster_path));	
   	}
   }
   
