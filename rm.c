@@ -24,7 +24,6 @@ int main(int argc, char *argv[]) {
 	int c;
 	std::vector<std::string> files;
 	char* dumpster_path;
-	char current_path[PATH_MAX];
 	char buf[PATH_MAX];
 
 	while ((c = getopt(argc, argv, "fhr")) != -1) {
@@ -62,21 +61,9 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	if (getcwd(current_path, PATH_MAX) == NULL) {
-		std::cerr << "getcwd:" << strerror(errno) << std::endl;
-		return -1;
-	}
-
   //parse filenames into a vector
   for (; optind < argc; optind++) {
   	std::string temp = std::string(argv[optind]);
-
-  	//if the path is not an absolute path
-  	// turn it into an absolute path
-  	if(temp.front() != '/') {
-  		temp.insert(0, "/");
-  		temp.insert(0, current_path);
-  	}
 
   	if (realpath(temp.c_str(), buf)) {
 	  	std::cout << buf << std::endl;
@@ -84,6 +71,7 @@ int main(int argc, char *argv[]) {
   	}
   	else {
   		std::cerr << "realpath: " <<  temp << strerror(errno) << std::endl;
+  		return -1;
   	}
   }
 
@@ -102,7 +90,7 @@ int main(int argc, char *argv[]) {
   		force_remove(file);
   	}
   	else {
-  		to_dumpster(file, std::string(dumpster_path).append("/"));	
+  		send_file_to(file, std::string(dumpster_path).append("/"));	
   	}
   }
   
@@ -114,6 +102,7 @@ void print_help() {
 	std::cout <<
 		"-h      display a basic help and usage message\n"
 		"-f      force a complete remove, do not move to dumpster\n"
-		"-r      remove directories and their contents recursively\n";
-	exit(1);
+		"-r      remove directories and their contents recursively\n"
+		"file [file ...] – one or more file(s) to be removed\n";
+	return;
 }

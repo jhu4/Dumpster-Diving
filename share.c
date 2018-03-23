@@ -53,12 +53,12 @@ void force_remove(std::string file) {
 	return;
 }
 
-void to_dumpster(std::string file, std::string dumpster_path) {
+void send_file_to(std::string file, std::string dest_path) {
 	struct stat metadata;
 	int ext;
 
 	char* file_basename = basename((char*)file.c_str());
-	std::string dest = std::string(dumpster_path)
+	std::string dest = std::string(dest_path)
   															.append("/")
   															.append(file_basename)
   															.c_str();
@@ -72,6 +72,7 @@ void to_dumpster(std::string file, std::string dumpster_path) {
 		std::cerr << "capacity of " << file_basename << " reaches maximum" << std::endl;
 		return;
 	}
+	
 	else if (ext > 0) {
 		dest.append(".").append(std::to_string(ext));
 	}
@@ -80,19 +81,19 @@ void to_dumpster(std::string file, std::string dumpster_path) {
 
 	if (i == -1) {
 		// std::cerr << file << ": " <<  strerror(errno) << std::endl;
-		to_dumpster_recursively(file, std::string(""), dumpster_path);
+		send_file_to_recursively(file, std::string(""), dest_path);
 	}
 }
 
 
-void to_dumpster_recursively(std::string full_path
+void send_file_to_recursively(std::string full_path
 																	, std::string relative_parent_path
-																	, std::string dumpster_path) {
+																	, std::string dest_path) {
 	char* base_name = basename((char*)full_path.c_str());
 	struct stat metadata;
 	struct dirent* dir_metadata;
 	DIR* dir_ptr;
-	std::string dest = std::string(dumpster_path)
+	std::string dest = std::string(dest_path)
 																			.append(relative_parent_path)
 																			.append(base_name);
 
@@ -140,7 +141,7 @@ void to_dumpster_recursively(std::string full_path
 	}
 
 	std::string next_relative_parent_path = std::string(dest)
-																								.erase(0, dumpster_path.length())
+																								.erase(0, dest_path.length())
 																								.append("/");
 
 	while (dir_metadata = readdir(dir_ptr)) {
@@ -148,8 +149,8 @@ void to_dumpster_recursively(std::string full_path
 																	.append("/")
 																	.append(dir_metadata->d_name);
 		if (dot.compare(dir_metadata->d_name) && dotdot.compare(dir_metadata->d_name)) {
-			to_dumpster_recursively(next_full_path
-														, next_relative_parent_path, dumpster_path);
+			send_file_to_recursively(next_full_path
+														, next_relative_parent_path, dest_path);
 		}
 	}
 	
@@ -218,27 +219,3 @@ int get_ext(std::string filename) {
 	}
 }
 
-void print_stat(std::string path) {
-	struct stat tmp;
-
-	int i;
-	if ((i = stat(path.c_str(), &tmp)) == -1) {
-		std::cout << "stat() error code on " << path.c_str() << std::endl;
-		return;
-	}
-
-	std::cout << tmp.st_dev << std::endl;
-	std::cout << tmp.st_ino << std::endl;
-	std::cout << tmp.st_mode << "\t--permission" << std::endl;
-	std::cout << tmp.st_nlink << std::endl;
-	std::cout << tmp.st_uid << std::endl;
-	std::cout << tmp.st_gid << std::endl;
-	std::cout << tmp.st_rdev << std::endl;
-	std::cout << tmp.st_size << std::endl;
-	std::cout << tmp.st_blksize << std::endl;
-	std::cout << tmp.st_blocks << std::endl;
-	std::cout << tmp.st_atime << "\t--access time" << std::endl;
-	std::cout << tmp.st_mtime << "\t--modify time" << std::endl;
-	std::cout << tmp.st_ctime << std::endl;
-
-}
