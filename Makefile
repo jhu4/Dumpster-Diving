@@ -1,6 +1,5 @@
 all: rm dv dump test
-	mkdir -p .build
-	mv *.o .build/
+	rm *.o
 
 rm: rm.o share.o
 	g++ rm.o share.o -o rm
@@ -31,4 +30,3 @@ test.o:
 
 clean:
 	rm rm dv dump test
-	rm -rf .build
