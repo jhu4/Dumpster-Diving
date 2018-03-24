@@ -1,3 +1,7 @@
+*.zip
+
+hu_proj1/*
+
 trashcan/*
 
 rm 
